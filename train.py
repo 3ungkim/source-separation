@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from loss import SDRLoss
-from loss import pit
+from loss import PIT
 from data.mkdata import VCTKDataset
 from model.pit_cnn import PITCNN
 
@@ -55,7 +55,7 @@ def train(model):
             est_list = [est1, est2]
             dic_est_src = {"est": est_list, "src": src_list}
 
-            loss = pit(SDRLoss, dic_est_src)
+            loss = PIT(SDRLoss, dic_est_src)
             loss.backward()
             optimizer.step()
 
