@@ -12,7 +12,7 @@ def SDRLoss(est, src):
     return sdr
 
 
-def pit(loss, dic_est_src):
+def PIT(loss, dic_est_src):
     """
     dic_est_src = {
         "est": [list of est tensors=[batch, time]], "src": [list of sources=[batch,time]]
