@@ -6,12 +6,6 @@ import pandas as pd
 import librosa
 
 
-"""
-1. make files that has every file names
-2. using datasetclass make dataset class
-3. transform class
-4. dataloader
-"""
 if __name__=="__main__":
     np.random.seed(27)
     path = os.getcwd()

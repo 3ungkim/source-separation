@@ -1,4 +1,5 @@
 import torch
+from itertools import permutations
 
 
 #signal distortion rate(sdr)
@@ -21,16 +22,18 @@ def pit(loss, dic_est_src):
     """
     est_set = dic_est_src["est"]
     src_set = dic_est_src["src"]
+    batch = est_set[0].shape[0]
+    num = len(est_set)
 
-    #est_permute 필요
-    #est_permute = 
+    est_permute = permutations(est_set)
 
     #fix src and permute est so that we can calculate all permutation of est and src
-    #est_list = [list of est tensor=[batch, time]]
-    for i, est_list in enumerate(est_permute):
-        batch = est_list[0].shape[0]
+    #est_permute: list of permutation order(tuple), [(perm1), ..., (permk)]
+    #perm i: tuple of permutation num i, ex) (0, 3, 1, 2)
+    for i, permute in enumerate(est_permute):
         loss_temp = torch.zeros(batch)
-        for est, src in zip(est_list, src_set):
+        for est, src in zip(permute, src_set):
+            
             loss_temp = torch.add(loss_temp, loss(est, src))
 
         if i==0:
