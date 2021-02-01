@@ -22,17 +22,18 @@ class DownBlock(nn.Module):
 
 class UpBlock(nn.Module):
     def __init__(self, in_channel, out_channel, up_channel, size_conv=5):
+        super(UpBlock, self).__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
-        self.up_channel - up_channel
+        self.up_channel = up_channel
         self.size_conv = size_conv
         self.upsample = nn.Conv1d(up_channel, up_channel, 2)
         self.conv = nn.Conv1d(in_channel, out_channel, size_conv)
     
-    def forward(self, x, dsblock):
+    def forward(self, x, dscrop):
         #Upsample1
         #learned linear interpolation can be interpreted as conv, wft + (1-w)ft+1
-        regul = torch.sum(self.upsample.weight, dim=-1, keepkim=True)
+        regul = torch.sum(self.upsample.weight, dim=-1, keepdim=True)
         param = torch.div(self.upsample.weight, regul)
         self.upsample.weight = nn.parameter.Parameter(param)
         interpol = self.upsample(x)
@@ -40,13 +41,17 @@ class UpBlock(nn.Module):
         #Upsample2
         #concatenate origin tensor and upsampled tensor(interpolated tensor)
         shape = list(x.shape)
-        shape[-1] = shape[-1]*2
+        shape[-1] = shape[-1]*2 - 1
         out = torch.zeros(shape)
-        out[:,:,0::2] = x
-        out[:,:,1::2] = interpol
+        out[:, :, 0::2] = x
+        out[:, :, 1::2] = interpol
 
-        #Concat
-        out = torch.cat((x, dsblock), dim=1)
+        #Crop and Concat
+        crop_first = int((dscrop.shape[2])/2 - (out.shape[2])/2)
+        crop_last = int((dscrop.shape[2])/2 + (out.shape[2])/2)
+        crop = dscrop[:, :, crop_first:crop_last]
+
+        out = torch.cat((out, crop), dim=1)
 
         #Conv1d
         out = self.conv(out)
@@ -64,14 +69,14 @@ class WaveUNet(nn.Module):
 
         self.dsblock_list = self._repeat_dsblock(
             layer_num=layer_num,
-            size_conv=size_dsconv, 
+            size_conv=size_dsconv,
             channel_size=channel_size
         )
         self.conv1 = nn.Conv1d(
             in_channels=channel_size*layer_num,
             out_channels=channel_size*(layer_num+1),
             kernel_size=size_dsconv
-        ) 
+        )
         self.usblock_list = self._repeat_usblock(
             layer_num=layer_num,
             size_conv=size_usconv,
@@ -85,6 +90,7 @@ class WaveUNet(nn.Module):
 
 
     def forward(self, x):
+        x = torch.unsqueeze(x, dim=1)
         init_val = copy.deepcopy(x)
         #downsample block
         dscrop_list = []
@@ -94,17 +100,21 @@ class WaveUNet(nn.Module):
 
         #middle block
         x = self.conv1(x)
-
+        
         #upsample block
-        ################################################block concat size 맞추기
         dscrop_list.reverse()
         for usblock, dscrop in zip(self.usblock_list, dscrop_list):
             x = usblock(x, dscrop)
-        
+
         #final block
-        ################################################block concat size 맞추기
-        out = torch.cat((x, init_val), dim=1)
+        crop_first = int((init_val.shape[2])/2 - (x.shape[2])/2)
+        crop_last = int((init_val.shape[2])/2 + (x.shape[2])/2)
+        crop = init_val[:, :, crop_first:crop_last]
+
+        out = torch.cat((x, crop), dim=1)
         out = self.conv2(out)
+
+        return torch.squeeze(out, dim=1)
 
     def _repeat_dsblock(self, layer_num=12, size_conv=15, channel_size=24):
         dsblock_list = nn.ModuleList([DownBlock(1, channel_size, size_conv)])
@@ -113,17 +123,17 @@ class WaveUNet(nn.Module):
                 in_channel=channel_size*i,
                 out_channel=channel_size*(i+1),
                 size_conv=size_conv
-            )) 
+            ))
         return dsblock_list
 
     def _repeat_usblock(self, layer_num=12, size_conv=5, channel_size=24):
         #UpBlock(in_channel, out_channel, up_channel, size_conv)
         usblock_list = nn.ModuleList()
-        for i in range(layer_num, 0):
+        for i in range(layer_num, 0, -1):
             usblock_list.append(UpBlock(
-                in_channel=channel_size*(2*layer_num+1),
-                out_channel=channel_size*layer_num,
-                up_channel=channel_size*(layer_num+1),
+                in_channel=channel_size*(2*i+1),
+                out_channel=channel_size*i,
+                up_channel=channel_size*(i+1),
                 size_conv=size_conv
             ))
         return usblock_list

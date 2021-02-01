@@ -21,22 +21,23 @@ if __name__=="__main__":
 
     for i in index_spker_test:
         path_list_test = os.listdir(f"{path}/VCTK-corpus/wav48/{i}")
-        df_temp_path = pd.Dataframe(path_list_test, columns=['path'])
+        df_temp_path = pd.DataFrame(path_list_test, columns=['path'])
         df_temp_path['path'] = df_temp_path['path'].apply(
             lambda x: os.path.join(f"{path}/VCTK-corpus/wav48/{i}",x)
         )
-        df_path = pd.concat([df_path_test, df_temp_path], ignore_index=True)
+        df_path_test = pd.concat([df_path_test, df_temp_path], ignore_index=True)
 
     df_path_test.to_csv("source_path_test.csv")
     n_source_test = len(df_path_test.index)
     #mix_index_test is mixed source index of sources
-    mix_index_test = np.random.randint(0, n_source, size=(2000, 2))
+    mix_index_test = np.random.randint(0, n_source_test, size=(2000, 2))
     np.save(f"{path}/mix_index_test", mix_index_test)
 
     #df_path is dataframe of all data sources path of train dataset(without test)
     df_path = pd.DataFrame(columns=['path'])
 
-    for i in index_spker:
+    index_spker.remove(".DS_Store") #add line 39 because of unexpected error
+    for i in index_spker[:-1]:
         path_list = os.listdir(f"{path}/VCTK-corpus/wav48/{i}")
         df_temp_path = pd.DataFrame(path_list, columns=['path'])
         df_temp_path['path'] = df_temp_path['path'].apply(
@@ -75,4 +76,4 @@ class VCTKDataset(Dataset):
         return source
 
     def __len__(self):
-        return len(df_path.index)
+        return len(self.df_path.index)

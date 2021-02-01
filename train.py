@@ -6,6 +6,7 @@ from loss import SDRLoss
 from loss import PIT
 from data.mkdata import VCTKDataset
 from model.pit_cnn import PITCNN
+from model.waveunet import WaveUNet
 
 
 parser = argparse.ArgumentParser(description="type hyperparams")
@@ -46,13 +47,22 @@ def train(model):
         for i in range(2500):
             src1 = train1.next()
             src2 = train2.next()
-            src_list = [src1, src2]
             mix = src1 + src2
 
             optimizer.zero_grad()
 
-            est1, est2 = model(mix)
+            est1 = model(mix)
+
+            crop_first = int((mix.shape[-1])/2 - (est1.shape[-1])/2)
+            crop_last = crop_first + est1.shape[-1]
+
+            mix = mix[:, crop_first:crop_last]
+            est2 = mix - est1
+            src1 = src1[:, crop_first:crop_last]
+            src2 = src2[:, crop_first:crop_last]
+
             est_list = [est1, est2]
+            src_list = [src1, src2]
             dic_est_src = {"est": est_list, "src": src_list}
 
             loss = PIT(SDRLoss, dic_est_src)
@@ -60,12 +70,22 @@ def train(model):
             optimizer.step()
 
             running_loss += loss.item()
-            if i%500==499:
-                print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/500}')
-                if epoch==0 and i==1:
+
+            #if i%500==499:
+                #print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/500}')
+                #if epoch==0 and i==499:
+                    #best_loss = running_loss
+
+            if i%10==9:
+                print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/10}')
+
+                if epoch==0 and i==9:
                     best_loss = running_loss
+
                 elif best_loss > running_loss:
+                    best_loss = running_loss
                     torch.save(model.state_dict(), "./model/saved_model.pt")
+
                 else:
                     pass
 
@@ -78,8 +98,8 @@ if __name__=="__main__":
     np.random.seed(27)
     torch.manual_seed(27)
 
-    if model_name=="pitcnn":
-        model = PITCNN()
+    if model_name=="waveunet":
+        model = WaveUNet(layer_num=10, size_dsconv=15, size_usconv=5, channel_size=24, source_num=2)
         train(model)
     else:
         print("wrong model name")
