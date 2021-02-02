@@ -1,5 +1,7 @@
 import argparse
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import DataLoader
 from loss import SDRLoss
@@ -7,6 +9,7 @@ from loss import PIT
 from data.mkdata import VCTKDataset
 from model.pit_cnn import PITCNN
 from model.waveunet import WaveUNet
+from utils import max_regul
 
 
 parser = argparse.ArgumentParser(description="type hyperparams")
@@ -28,7 +31,7 @@ def train(model):
     train_loader1 = DataLoader(train_source1, batch_size=batch_size, shuffle=True)
     train_loader2 = DataLoader(train_source2, batch_size=batch_size, shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
     for epoch in range(60):
@@ -46,8 +49,10 @@ def train(model):
         train2 = iter(train_loader2)
         for i in range(2500):
             src1 = train1.next()
+            src1 = max_regul(src1)
             src2 = train2.next()
-            mix = src1 + src2
+            src2 - max_regul(src2)
+            mix = torch.add(src1, src2)
 
             optimizer.zero_grad()
 
@@ -58,6 +63,7 @@ def train(model):
 
             mix = mix[:, crop_first:crop_last]
             est2 = mix - est1
+
             src1 = src1[:, crop_first:crop_last]
             src2 = src2[:, crop_first:crop_last]
 
@@ -65,21 +71,24 @@ def train(model):
             src_list = [src1, src2]
             dic_est_src = {"est": est_list, "src": src_list}
 
-            loss = PIT(SDRLoss, dic_est_src)
+            #loss = PIT(SDRLoss, dic_est_src)
+            loss = PIT(loss=F.mse_loss, dic_est_src=dic_est_src)
+            print("loss", loss.item())
+            
             loss.backward()
             optimizer.step()
 
+            #for name, param in model.named_parameters():
+                #if param.grad is not None:
+                    #print("param grad", name, param.grad.sum())
+                #else:
+                    #print(name, param.grad)
+
             running_loss += loss.item()
 
-            #if i%500==499:
-                #print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/500}')
-                #if epoch==0 and i==499:
-                    #best_loss = running_loss
-
-            if i%10==9:
-                print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/10}')
-
-                if epoch==0 and i==9:
+            if i%100==99:
+                print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/100}')
+                if epoch==0 and i==99: #best_loss = running_loss
                     best_loss = running_loss
 
                 elif best_loss > running_loss:
@@ -95,8 +104,8 @@ def train(model):
 
 
 if __name__=="__main__":
-    np.random.seed(27)
-    torch.manual_seed(27)
+    np.random.seed(820)
+    torch.manual_seed(820)
 
     if model_name=="waveunet":
         model = WaveUNet(layer_num=10, size_dsconv=15, size_usconv=5, channel_size=24, source_num=2)

@@ -11,10 +11,15 @@ class DownBlock(nn.Module):
         self.out_channel = out_channel
         self.size_conv = size_conv
         self.conv = nn.Conv1d(in_channel, out_channel, size_conv)
+        #self.norm = nn.BatchNorm1d(out_channel, momentum=0.01)
+        self.norm = nn.BatchNorm1d(out_channel)
+        self.lrelu = nn.LeakyReLU()
 
     def forward(self, x):
         #conv1d
         out1 = self.conv(x)
+        out1 = self.norm(out1)
+        out1 = self.lrelu(out1)
         #decimate
         out2 = out1[:,:,0::2]
         return out1, out2
@@ -27,22 +32,29 @@ class UpBlock(nn.Module):
         self.out_channel = out_channel
         self.up_channel = up_channel
         self.size_conv = size_conv
+
         self.upsample = nn.Conv1d(up_channel, up_channel, 2)
+        #self.sig = nn.Sigmoid()
         self.conv = nn.Conv1d(in_channel, out_channel, size_conv)
-    
+        self.norm = nn.BatchNorm1d(out_channel, momentum=0.01)
+        self.lrelu = nn.LeakyReLU()
+        
     def forward(self, x, dscrop):
         #Upsample1
         #learned linear interpolation can be interpreted as conv, wft + (1-w)ft+1
-        regul = torch.sum(self.upsample.weight, dim=-1, keepdim=True)
-        param = torch.div(self.upsample.weight, regul)
-        self.upsample.weight = nn.parameter.Parameter(param)
+        #conv_weight = self.sig(self.upsample.weight)
+        #conv_regul = torch.sum(conv_weight, dim=-1, keepdim=True)
+        #param = torch.div(conv_weight, conv_regul)
+        #param[torch.isnan(param)] = 0
+        #self.upsample.weight = nn.Parameter(param, requires_grad=True)
+
         interpol = self.upsample(x)
         
         #Upsample2
         #concatenate origin tensor and upsampled tensor(interpolated tensor)
         shape = list(x.shape)
         shape[-1] = shape[-1]*2 - 1
-        out = torch.zeros(shape)
+        out = torch.ones(shape)
         out[:, :, 0::2] = x
         out[:, :, 1::2] = interpol
 
@@ -55,6 +67,8 @@ class UpBlock(nn.Module):
 
         #Conv1d
         out = self.conv(out)
+        out = self.norm(out)
+        out = self.lrelu(out)
 
         return out
 
@@ -77,6 +91,8 @@ class WaveUNet(nn.Module):
             out_channels=channel_size*(layer_num+1),
             kernel_size=size_dsconv
         )
+        self.norm1 = nn.BatchNorm1d(channel_size*(layer_num+1), momentum=0.01)
+        self.lrelu = nn.LeakyReLU()
         self.usblock_list = self._repeat_usblock(
             layer_num=layer_num,
             size_conv=size_usconv,
@@ -87,32 +103,39 @@ class WaveUNet(nn.Module):
             out_channels=source_num-1,
             kernel_size=1
         )
+        self.norm2 = nn.BatchNorm1d(source_num-1, momentum=0.01)
+        self.tanh = nn.Tanh()
 
 
     def forward(self, x):
         x = torch.unsqueeze(x, dim=1)
-        init_val = copy.deepcopy(x)
+        out = copy.deepcopy(x)
+
         #downsample block
         dscrop_list = []
         for dsblock in self.dsblock_list:
-            dscrop, x = dsblock(x)
+            dscrop, out = dsblock(out)
             dscrop_list.append(dscrop)
 
         #middle block
-        x = self.conv1(x)
-        
+        out = self.conv1(out)
+        out = self.norm1(out)
+        out = self.lrelu(out)
+
         #upsample block
         dscrop_list.reverse()
         for usblock, dscrop in zip(self.usblock_list, dscrop_list):
-            x = usblock(x, dscrop)
+            out = usblock(out, dscrop)
 
         #final block
-        crop_first = int((init_val.shape[2])/2 - (x.shape[2])/2)
-        crop_last = int((init_val.shape[2])/2 + (x.shape[2])/2)
-        crop = init_val[:, :, crop_first:crop_last]
+        crop_first = int((x.shape[2])/2 - (out.shape[2])/2)
+        crop_last = int((x.shape[2])/2 + (out.shape[2])/2)
+        crop = x[:, :, crop_first:crop_last]
 
-        out = torch.cat((x, crop), dim=1)
+        out = torch.cat((out, crop), dim=1)
         out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.tanh(out)
 
         return torch.squeeze(out, dim=1)
 
@@ -137,4 +160,3 @@ class WaveUNet(nn.Module):
                 size_conv=size_conv
             ))
         return usblock_list
-
