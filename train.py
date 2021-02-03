@@ -26,13 +26,17 @@ model_name = args.model
 
 
 def train(model):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print('device: ', device)
     train_source1 = VCTKDataset(path_csv="./data/source_path.csv", time=time, sr=sr)
     train_source2 = VCTKDataset(path_csv="./data/source_path.csv", time=time, sr=sr)
     train_loader1 = DataLoader(train_source1, batch_size=batch_size, shuffle=True)
     train_loader2 = DataLoader(train_source2, batch_size=batch_size, shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+
+    model.to(device)
 
     for epoch in range(60):
         model.train()
@@ -49,9 +53,13 @@ def train(model):
         train2 = iter(train_loader2)
         for i in range(2500):
             src1 = train1.next()
+            src1 = src1.to(device)
             src1 = max_regul(src1)
+
             src2 = train2.next()
+            src2 = src2.to(device)
             src2 = max_regul(src2)
+
             mix = torch.add(src1, src2)
 
             optimizer.zero_grad()
@@ -73,7 +81,6 @@ def train(model):
 
             #loss = PIT(SDRLoss, dic_est_src)
             loss = PIT(loss=F.mse_loss, dic_est_src=dic_est_src)
-            print("loss", loss.item())
             
             loss.backward()
             optimizer.step()
@@ -101,7 +108,6 @@ def train(model):
                 running_loss = 0.0
 
         scheduler.step()
-
 
 if __name__=="__main__":
     np.random.seed(820)

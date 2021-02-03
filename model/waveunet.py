@@ -32,6 +32,7 @@ class UpBlock(nn.Module):
         self.out_channel = out_channel
         self.up_channel = up_channel
         self.size_conv = size_conv
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.upsample = nn.Conv1d(up_channel, up_channel, 2)
         #self.sig = nn.Sigmoid()
@@ -54,7 +55,7 @@ class UpBlock(nn.Module):
         #concatenate origin tensor and upsampled tensor(interpolated tensor)
         shape = list(x.shape)
         shape[-1] = shape[-1]*2 - 1
-        out = torch.ones(shape)
+        out = torch.ones(shape, device=self.device)
         out[:, :, 0::2] = x
         out[:, :, 1::2] = interpol
 
@@ -109,7 +110,7 @@ class WaveUNet(nn.Module):
 
     def forward(self, x):
         x = torch.unsqueeze(x, dim=1)
-        out = copy.deepcopy(x)
+        out = torch.clone(x)
 
         #downsample block
         dscrop_list = []
