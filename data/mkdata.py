@@ -13,6 +13,9 @@ if __name__=="__main__":
     #index_spker : all speaker index
     #index_spker_test : test speaker index
     index_spker = os.listdir(f"{path}/VCTK-corpus/wav48")
+    if '.DS_Store' in index_spker:
+        index_spker.remove('.DS_Store')
+
     index_spker_test = np.random.choice(index_spker, 10)
     index_spker = list(set(index_spker)-set(index_spker_test))
 
@@ -21,6 +24,11 @@ if __name__=="__main__":
 
     for i in index_spker_test:
         path_list_test = os.listdir(f"{path}/VCTK-corpus/wav48/{i}")
+            
+        #for handling unexpected error
+        if '.DS_Store' in path_list_test:
+            path_list_test.remove('.DS_Store')
+
         df_temp_path = pd.DataFrame(path_list_test, columns=['path'])
         df_temp_path['path'] = df_temp_path['path'].apply(
             lambda x: os.path.join(f"{path}/VCTK-corpus/wav48/{i}",x)
@@ -36,9 +44,13 @@ if __name__=="__main__":
     #df_path is dataframe of all data sources path of train dataset(without test)
     df_path = pd.DataFrame(columns=['path'])
 
-    index_spker.remove(".DS_Store") #add line 39 because of unexpected error
     for i in index_spker[:-1]:
         path_list = os.listdir(f"{path}/VCTK-corpus/wav48/{i}")
+        
+        #for handling unexpected error
+        if '.DS_Store' in path_list:
+            path_list.remove('.DS_Store')
+
         df_temp_path = pd.DataFrame(path_list, columns=['path'])
         df_temp_path['path'] = df_temp_path['path'].apply(
             lambda x: os.path.join(f"{path}/VCTK-corpus/wav48/{i}",x)

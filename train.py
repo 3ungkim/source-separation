@@ -31,7 +31,7 @@ def train(model):
     train_loader1 = DataLoader(train_source1, batch_size=batch_size, shuffle=True)
     train_loader2 = DataLoader(train_source2, batch_size=batch_size, shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
     for epoch in range(60):
@@ -51,7 +51,7 @@ def train(model):
             src1 = train1.next()
             src1 = max_regul(src1)
             src2 = train2.next()
-            src2 - max_regul(src2)
+            src2 = max_regul(src2)
             mix = torch.add(src1, src2)
 
             optimizer.zero_grad()
