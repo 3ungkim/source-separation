@@ -4,14 +4,12 @@ from itertools import permutations
 
 #signal distortion rate(sdr)
 #est, src = [batch, leng_signal]
-#THERE IS AN ERROR! DO NOT USE SDRLoss YET
 def SDRLoss(est, src):
+    eps = 1e-5
     dot = torch.sum(torch.mul(est, src), dim=1)
-    #est_s = torch.sqrt(torch.sum(est**2, dim=1))
-    #src_s = torch.sqrt(torch.sum(src**2, dim=1))
-    est_s = torch.sum(est**2, dim=1)
-    src_s = torch.sum(src**2, dim=1)
-    sdr = -torch.div(dot, torch.mul(est_s, src_s)) #sdr = [batch]
+    est_norm = est.norm(dim=1)
+    src_norm = src.norm(dim=1)
+    sdr = -torch.div(dot, torch.mul(est_norm, src_norm)+eps) #sdr = [batch]
     sdr[torch.isnan(sdr)] = 0
     return sdr
 

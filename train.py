@@ -17,12 +17,14 @@ parser.add_argument("--time", type=int, help="source length")
 parser.add_argument("--sr", type=int, help="sampling rate")
 parser.add_argument("--batch", type=int, help="batch size")
 parser.add_argument("--model", type=str, help="model type")
+parser.add_argument("--lr", type=float, help="learning rate")
 args = parser.parse_args()
 
 time = args.time
 sr = args.sr 
 batch_size = args.batch
 model_name = args.model
+lr = args.lr
 
 
 def train(model):
@@ -33,7 +35,7 @@ def train(model):
     train_loader1 = DataLoader(train_source1, batch_size=batch_size, shuffle=True)
     train_loader2 = DataLoader(train_source2, batch_size=batch_size, shuffle=True)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
     model.to(device)
@@ -79,8 +81,8 @@ def train(model):
             src_list = [src1, src2]
             dic_est_src = {"est": est_list, "src": src_list}
 
-            #loss = PIT(SDRLoss, dic_est_src)
-            loss = PIT(loss=F.mse_loss, dic_est_src=dic_est_src)
+            loss = PIT(SDRLoss, dic_est_src)
+            print("loss", loss.item())
             
             loss.backward()
             optimizer.step()
@@ -95,13 +97,12 @@ def train(model):
 
             if i%100==99:
                 print(f'Train Epoch: {epoch+1}/60 {i+1}/2500\tLoss: {running_loss/100}')
+
                 if epoch==0 and i==99: #best_loss = running_loss
                     best_loss = running_loss
-
                 elif best_loss > running_loss:
                     best_loss = running_loss
                     torch.save(model.state_dict(), "./model/saved_model.pt")
-
                 else:
                     pass
 
