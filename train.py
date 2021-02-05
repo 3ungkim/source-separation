@@ -55,11 +55,9 @@ def train(model):
         train2 = iter(train_loader2)
         for i in range(2500):
             src1 = train1.next()
-            src1 = src1.to(device)
             src1 = max_regul(src1)
 
             src2 = train2.next()
-            src2 = src2.to(device)
             src2 = max_regul(src2)
 
             mix = torch.add(src1, src2)
