@@ -70,22 +70,27 @@ class VCTKDataset(Dataset):
         self.df_path = pd.read_csv(path_csv)
         self.sr = sr 
         self.time = time
+        self.eps = 1e-6
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
     def __getitem__(self, index):
         path = self.df_path['path'][index]
         len_source = self.sr * self.time
         source, _ = librosa.load(path, sr=self.sr)
-        source = torch.from_numpy(source)
+        source = torch.from_numpy(source).to(self.device)
 
         #fix the time of sources
         if len(source)>=len_source:
             source = source[0:len_source]
-        else:
-            temp_source = torch.zeros([len_source])
-            temp_source[:len(source)] = source
-            source = temp_source
+            return source
 
-        return source
+        else:
+            updated_source = torch.zeros([len_source], device=self.device)
+            updated_source = updated_source + self.eps
+            crop_first = int(len_source/2 - len(source)/2)
+            crop_last = crop_first + len(source)
+            updated_source[crop_first:crop_last] = source
+            return updated_source
 
     def __len__(self):
         return len(self.df_path.index)
